@@ -35,16 +35,17 @@ def main():
     cap = cv2.VideoCapture(0)
     # cap = cv2.VideoCapture('rtsp://admin:comvis@123@192.168.1.64/H264?ch=1&subtype=0')  #  - rtsp://admin:comvis@123@192.168.1.64:554/H.264
     assert cap.isOpened(), 'Unable to connect to camera'
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     print('Loading models')
     detector = Detector('weights/yolov5s.pt', img_size=(640, 640),
                         conf_thresh=0.4, iou_thresh=0.5, agnostic_nms=False,
-                        device='cuda:0')
+                        device=device)
     deepsort = DeepSort('weights/ckpt.t7',
                         max_dist=0.2, min_confidence=0.3,
                         nms_max_overlap=0.5, max_iou_distance=0.7,
                         max_age=70, n_init=3, nn_budget=100,
-                        device='cuda:0')
+                        device=device)
     bboxes_visualizer = BoundingBoxesVisualizer()
     fps_estimator = MeanEstimator()
     person_cls_id = detector.names.index('person')  # get id of 'person' class
@@ -86,9 +87,9 @@ def main():
         overlay = img.copy()
         count_str = f'Number of people: {num_people}'
         text_size = cv2.getTextSize(count_str, 0, fontScale=0.5, thickness=1)[0]
-        cv2.rectangle(overlay, (10, 660 + 10), (15 + text_size[0], 660 + 20 + text_size[1]), (255, 255, 255), -1)
+        cv2.rectangle(overlay, (10, 10 + 10), (15 + text_size[0], 10 + 20 + text_size[1]), (255, 255, 255), -1)
         img = cv2.addWeighted(overlay, 0.4, img, 0.6, 0)
-        cv2.putText(img, count_str, (12, 660 + 15 + text_size[1]), 0, 0.5, (0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(img, count_str, (12, 10 + 15 + text_size[1]), 0, 0.5, (0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
 
         # show
         cv2.imshow(win_name, img)
