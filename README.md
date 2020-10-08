@@ -5,7 +5,7 @@
 - torchvision
 
 ### Pretrained weights:
-Download về và để vào folder `weights`.
+Download các file `.pt` về, tạo một folder tên `weights` và copy tất cả vào.
 | Model (scale)         |                                 Download Link                                   |
 |-----------------------|:-------------------------------------------------------------------------------:|
 | yolov5s (small)       | https://github.com/ultralytics/yolov5/releases/download/v3.0/weights/yolov5s.pt |
