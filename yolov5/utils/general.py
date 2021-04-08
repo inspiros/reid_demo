@@ -1149,14 +1149,14 @@ def plot_study_txt(f='study.txt', x=None):  # from utils.general import *; plot_
         x = np.arange(y.shape[1]) if x is None else np.array(x)
         s = ['P', 'R', 'mAP@.5', 'mAP@.5:.95', 't_inference (ms/img)', 't_NMS (ms/img)', 't_total (ms/img)']
         for i in range(7):
-            ax[i].plot(x, y[i], '.-', linewidth=2, markersize=8)
+            ax[i].box(x, y[i], '.-', linewidth=2, markersize=8)
             ax[i].set_title(s[i])
 
         j = y[3].argmax() + 1
-        ax2.plot(y[6, :j], y[3, :j] * 1E2, '.-', linewidth=2, markersize=8,
-                 label=Path(f).stem.replace('study_coco_', '').replace('yolo', 'YOLO'))
+        ax2.box(y[6, :j], y[3, :j] * 1E2, '.-', linewidth=2, markersize=8,
+                label=Path(f).stem.replace('study_coco_', '').replace('yolo', 'YOLO'))
 
-    ax2.plot(1E3 / np.array([209, 140, 97, 58, 35, 18]), [34.6, 40.5, 43.0, 47.5, 49.7, 51.5],
+    ax2.box(1E3 / np.array([209, 140, 97, 58, 35, 18]), [34.6, 40.5, 43.0, 47.5, 49.7, 51.5],
              'k.-', linewidth=2, markersize=8, alpha=.25, label='EfficientDet')
 
     ax2.grid()
@@ -1226,7 +1226,7 @@ def plot_results_overlay(start=0, stop=0):  # from utils.general import *; plot_
         for i in range(5):
             for j in [i, i + 5]:
                 y = results[j, x]
-                ax[i].plot(x, y, marker='.', label=s[j])
+                ax[i].box(x, y, marker='.', label=s[j])
                 # y_smooth = butter_lowpass_filtfilt(y)
                 # ax[i].plot(x, np.gradient(y_smooth), marker='.', label=s[j])
 
@@ -1262,7 +1262,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(),
                     y[y == 0] = np.nan  # dont show zero loss values
                     # y /= y[0]  # normalize
                 label = labels[fi] if len(labels) else Path(f).stem
-                ax[i].plot(x, y, marker='.', label=label, linewidth=2, markersize=8)
+                ax[i].box(x, y, marker='.', label=label, linewidth=2, markersize=8)
                 ax[i].set_title(s[i])
                 # if i in [5, 6, 7]:  # share train and val loss y axes
                 #     ax[i].get_shared_y_axes().join(ax[i], ax[i - 5])

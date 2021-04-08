@@ -3,9 +3,11 @@ import time
 import cv2
 import torch
 
-from bboxes_visualizer import BoundingBoxesVisualizer
+from bbox_visualizer import BBoxVisualizer
 from deep_sort import DeepSort
 from yolov5 import Detector
+from threaded_video_capture import ThreadedVideoCapture
+from tqdm import tqdm
 
 
 class MeanEstimator:
@@ -32,8 +34,9 @@ def parse_detection(det):
 
 def main():
     print('Connecting to camera')
-    cap = cv2.VideoCapture(0)
-    # cap = cv2.VideoCapture('rtsp://admin:comvis@123@192.168.1.64/H264?ch=1&subtype=0')  #  - rtsp://admin:comvis@123@192.168.1.64:554/H.264
+    # cap = cv2.VideoCapture(0)
+    cap = ThreadedVideoCapture('rtsp://admin:comvis@123@172.16.90.125:554/Streaming/Channels/101/')
+    # cap = ThreadedVideoCapture('rtsp://admin:comvis@123@172.16.90.125/H264?ch=1&subtype=0')
     assert cap.isOpened(), 'Unable to connect to camera'
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
@@ -44,9 +47,9 @@ def main():
     deepsort = DeepSort('weights/ckpt.t7',
                         max_dist=0.2, min_confidence=0.3,
                         nms_max_overlap=0.5, max_iou_distance=0.7,
-                        max_age=70, n_init=3, nn_budget=100,
+                        max_age=90, n_init=3, nn_budget=100,
                         device=device)
-    bboxes_visualizer = BoundingBoxesVisualizer()
+    bboxes_visualizer = BBoxVisualizer()
     fps_estimator = MeanEstimator()
     person_cls_id = detector.names.index('person')  # get id of 'person' class
 
@@ -54,11 +57,13 @@ def main():
     cam_fps = int(cap.get(cv2.CAP_PROP_FPS))
     print(f'Starting capture, camera_fps={cam_fps}')
 
-    # Start of demo
+    # Start
+    cap.start()
     win_name = 'MICA ReID Demo'
     cv2.namedWindow(win_name, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FREERATIO)
     cv2.resizeWindow(win_name, width, height)
     frame_id = 0
+    pbar = tqdm(desc=win_name)
     while True:
         start_it = time.time()
         ret, img = cap.read()
@@ -78,25 +83,26 @@ def main():
             bboxes_visualizer.update(outputs)
             # draw detections
             for pid in outputs[:, -1]:
-                bboxes_visualizer.plot(img, pid,
-                                       label=f'Person {pid}',
-                                       line_thickness=5,
-                                       trail_trajectory=True,
-                                       trail_bbox=False)
+                bboxes_visualizer.box(img, pid,
+                                      label=f'Person {pid}',
+                                      line_thickness=5,
+                                      trail_trajectory=True,
+                                      trail_bbox=False)
         # draw counting
-        overlay = img.copy()
         count_str = f'Number of people: {num_people}'
-        text_size = cv2.getTextSize(count_str, 0, fontScale=0.5, thickness=1)[0]
-        cv2.rectangle(overlay, (10, 10 + 10), (15 + text_size[0], 10 + 20 + text_size[1]), (255, 255, 255), -1)
-        img = cv2.addWeighted(overlay, 0.4, img, 0.6, 0)
-        cv2.putText(img, count_str, (12, 10 + 15 + text_size[1]), 0, 0.5, (0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        img = bboxes_visualizer.text(img, count_str, (960, 25),
+                                     fontScale=0.8, box_alpha=0.4,
+                                     color=(255, 255, 255), box_color=(0, 0, 0))
 
         # show
         cv2.imshow(win_name, img)
         key = cv2.waitKey(1)
         elapsed_time = time.time() - start_it
         fps = fps_estimator.update(1 / elapsed_time)
-        print(f'[{frame_id:06d}] num_detections={num_people} fps={fps:.02f} elapsed_time={elapsed_time:.03f}')
+
+        desc = f'[{frame_id:06d}] num_detections={num_people} fps={fps:.02f} elapsed_time={elapsed_time:.03f}'
+        pbar.update()
+        pbar.set_description(desc)
         # check key pressed
         if key == ord('q') or key == 27:  # q or esc to quit
             break

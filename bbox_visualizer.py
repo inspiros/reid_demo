@@ -3,7 +3,7 @@ import random
 import cv2
 
 
-class BoundingBoxesVisualizer:
+class BBoxVisualizer:
     def __init__(self, max_trail=10):
         self.bboxes = dict()
         self.max_trail = max_trail
@@ -33,7 +33,7 @@ class BoundingBoxesVisualizer:
     def __getitem__(self, item):
         return self.bboxes[item]
 
-    def plot(self, img, pid, label=None, line_thickness=3, trail_trajectory=False, trail_bbox=False):
+    def box(self, img, pid, label=None, line_thickness=3, trail_trajectory=False, trail_bbox=False):
         # Plots one bounding box on image img
         color = self.colors[pid % len(self.colors)]
         bboxes = self.bboxes[pid]
@@ -57,3 +57,18 @@ class BoundingBoxesVisualizer:
                 cv2.rectangle(img, p1, p2, color, -1, cv2.LINE_AA)
                 cv2.putText(img, label, (p1[0], p1[1] - 2), 0, font_scale, [225, 255, 255],
                             thickness=font_thickness, lineType=cv2.LINE_AA)
+
+    def text(self, img, text, xy, fontScale=1, thickness=1,
+             color=(0, 0, 0), box_color=(255, 255, 255), box_alpha=0):
+        text_size = cv2.getTextSize(text, 0, fontScale=fontScale, thickness=thickness)[0]
+        if box_alpha == 1:
+            cv2.rectangle(img, (xy[0] - 5, xy[1] - 5), (xy[0] + text_size[0] + 5, xy[1] + text_size[1] + 8),
+                          box_color, -1)
+        elif 0 < box_alpha < 1:
+            overlay = img.copy()
+            cv2.rectangle(overlay, (xy[0] - 5, xy[1] - 5), (xy[0] + text_size[0] + 5, xy[1] + text_size[1] + 8),
+                          box_color, -1)
+            img = cv2.addWeighted(overlay, box_alpha, img, 1 - box_alpha, 0)
+        cv2.putText(img, text, (xy[0], xy[1] + text_size[1]), 0,
+                    fontScale=fontScale, color=color, thickness=thickness, lineType=cv2.LINE_AA)
+        return img
