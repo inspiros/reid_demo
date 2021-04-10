@@ -1,15 +1,22 @@
 import random
 
 import cv2
+import numpy as np
+from matplotlib.cm import get_cmap
 
 
 class BBoxVisualizer:
-    def __init__(self, max_trail=10):
+    def __init__(self, max_trail=10, num_colors=32, num_color_parts=8):
         self.bboxes = dict()
         self.max_trail = max_trail
         if self.max_trail < 0:
             self.max_trail = float('inf')
-        self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(32)]
+
+        self.num_colors = num_colors
+        self.num_color_parts = num_color_parts
+        self.num_color_per_part = self.num_colors // self.num_color_parts
+        self.cmap = get_cmap('Spectral', num_colors)
+        self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(num_colors)]
 
     def update(self, track_outputs):
         for x1, y1, x2, y2, pid in track_outputs:
@@ -33,9 +40,13 @@ class BBoxVisualizer:
     def __getitem__(self, item):
         return self.bboxes[item]
 
-    def box(self, img, pid, label=None, line_thickness=3, trail_trajectory=False, trail_bbox=False):
+    def box(self, img, pid, label=None, label_color=(0, 0, 0),
+            line_thickness=3, trail_trajectory=False, trail_bbox=False):
         # Plots one bounding box on image img
-        color = self.colors[pid % len(self.colors)]
+        color = np.asarray(
+            self.cmap(pid // self.num_color_parts + (pid % self.num_color_parts) * self.num_color_per_part)[:3]
+        ).__mul__(255).round().astype(np.int64).tolist()
+        # self.colors[pid % len(self.colors)]
         bboxes = self.bboxes[pid]
         pc_ = None
         for bbox_id, bbox in enumerate(bboxes):
@@ -55,7 +66,7 @@ class BBoxVisualizer:
                 text_size = cv2.getTextSize(label, 0, fontScale=font_scale, thickness=font_thickness)[0]
                 p2 = p1[0] + text_size[0], p1[1] - text_size[1] - 3
                 cv2.rectangle(img, p1, p2, color, -1, cv2.LINE_AA)
-                cv2.putText(img, label, (p1[0], p1[1] - 2), 0, font_scale, [225, 255, 255],
+                cv2.putText(img, label, (p1[0], p1[1] - 2), 0, font_scale, label_color,
                             thickness=font_thickness, lineType=cv2.LINE_AA)
 
     def text(self, img, text, xy, fontScale=1, thickness=1,

@@ -8,20 +8,7 @@ from deep_sort import DeepSort
 from yolov5 import Detector
 from threaded_video_capture import ThreadedVideoCapture
 from tqdm import tqdm
-
-
-class MeanEstimator:
-    def __init__(self):
-        self.sum = self.mean = self.count = 0
-
-    def update(self, val):
-        self.count += 1
-        if self.count == 1:
-            self.sum = self.mean = val
-        else:
-            self.sum += val
-            self.mean = self.sum / self.count
-        return self.mean
+from incremental_mean_tracker import IncrementalMeanTracker
 
 
 def parse_detection(det):
@@ -35,28 +22,28 @@ def parse_detection(det):
 def main():
     print('Connecting to camera')
     # cap = cv2.VideoCapture(0)
-    cap = ThreadedVideoCapture('rtsp://admin:comvis@123@172.16.90.125:554/Streaming/Channels/101/')
-    # cap = ThreadedVideoCapture('rtsp://admin:comvis@123@172.16.90.125/H264?ch=1&subtype=0')
+    cap = ThreadedVideoCapture('rtsp://admin:comvis@123@192.168.100.125:554/Streaming/Channels/101/')
+    # cap = ThreadedVideoCapture('rtsp://admin:comvis@123@192.168.100.125/H264?ch=1&subtype=0')
     assert cap.isOpened(), 'Unable to connect to camera'
+    width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cam_fps = int(cap.get(cv2.CAP_PROP_FPS))
+
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     print('Loading models')
     detector = Detector('weights/yolov5s.pt', img_size=(640, 640),
-                        conf_thresh=0.4, iou_thresh=0.5, agnostic_nms=False,
+                        conf_thresh=0.5, iou_thresh=0.5, agnostic_nms=False,
                         device=device)
     deepsort = DeepSort('weights/ckpt.t7',
                         max_dist=0.2, min_confidence=0.3,
                         nms_max_overlap=0.5, max_iou_distance=0.7,
-                        max_age=90, n_init=3, nn_budget=100,
+                        max_age=100, lingering_age=5, n_init=5, nn_budget=100,
                         device=device)
     bboxes_visualizer = BBoxVisualizer()
-    fps_estimator = MeanEstimator()
+    fps_estimator = IncrementalMeanTracker(max_count=cam_fps * 5)
     person_cls_id = detector.names.index('person')  # get id of 'person' class
 
-    width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cam_fps = int(cap.get(cv2.CAP_PROP_FPS))
     print(f'Starting capture, camera_fps={cam_fps}')
-
     # Start
     cap.start()
     win_name = 'MICA ReID Demo'

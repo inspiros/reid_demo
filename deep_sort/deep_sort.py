@@ -1,10 +1,11 @@
 import numpy as np
 import torch
+from sortedcontainers import SortedSet
 
 from .deep.feature_extractor import Extractor
+from .sort.detection import Detection
 from .sort.nn_matching import NearestNeighborDistanceMetric
 from .sort.preprocessing import non_max_suppression
-from .sort.detection import Detection
 from .sort.tracker import Tracker
 
 __all__ = ['DeepSort']
@@ -12,9 +13,11 @@ __all__ = ['DeepSort']
 
 class DeepSort(object):
     def __init__(self, model_path, max_dist=0.2, min_confidence=0.3, nms_max_overlap=1.0, max_iou_distance=0.7,
-                 max_age=70, n_init=3, nn_budget=100, device='cpu'):
+                 max_age=70, lingering_age=1, n_init=3, nn_budget=100, device='cpu'):
         self.min_confidence = min_confidence
         self.nms_max_overlap = nms_max_overlap
+        self.max_age = max_age
+        self.lingering_age = lingering_age
         self.width = self.height = None
 
         self.extractor = Extractor(model_path, device=device)
@@ -22,6 +25,7 @@ class DeepSort(object):
         max_cosine_distance = max_dist
         metric = NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
         self.tracker = Tracker(metric, max_iou_distance=max_iou_distance, max_age=max_age, n_init=n_init)
+        self.unique_ids = SortedSet()
 
     def update(self, bbox_xywh, confidences, ori_img):
         self.height, self.width = ori_img.shape[:2]
@@ -44,12 +48,13 @@ class DeepSort(object):
         # output bbox identities
         outputs = []
         for track in self.tracker.tracks:
-            if not track.is_confirmed() or track.time_since_update > 1:
+            if not track.is_confirmed() or track.time_since_update > self.lingering_age:
                 continue
             box = track.to_tlwh()
             x1, y1, x2, y2 = self._tlwh_to_xyxy(box)
             track_id = track.track_id
-            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=np.int))
+            self.unique_ids.add(track_id)
+            outputs.append(np.array([x1, y1, x2, y2, self.unique_ids.index(track_id) + 1], dtype=np.int64))
         if len(outputs) > 0:
             return np.stack(outputs, axis=0)
         return np.empty((0, 2))
@@ -113,3 +118,4 @@ class DeepSort(object):
 
     def reset(self):
         self.tracker.reset()
+        self.unique_ids.clear()
